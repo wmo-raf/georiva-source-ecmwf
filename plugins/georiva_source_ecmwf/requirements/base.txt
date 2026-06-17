@@ -1,0 +1,2 @@
+# No extra pins: this plugin's dependencies (requests, django-timezone-field)
+# are provided by GeoRiva core. See base.in for documentation.

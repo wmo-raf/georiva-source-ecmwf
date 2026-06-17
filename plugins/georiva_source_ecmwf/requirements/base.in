@@ -1,0 +1,6 @@
+# Direct runtime dependencies for the ECMWF AIFS plugin.
+#
+# All are already provided by GeoRiva core (listed here to document the
+# dependency; do not re-pin, to avoid conflicting with core's versions):
+#   requests              — HEAD/GET against the ECMWF Open Data file server
+#   django-timezone-field — the feed's display_timezone field
