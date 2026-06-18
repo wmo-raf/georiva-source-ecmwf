@@ -47,14 +47,15 @@ def _pl_source(name, level):
     }
 
 
-def _pl_vars(base_key, base_name, units, value_range=None):
+def _pl_vars(base_key, base_name, source_units, value_range=None, output_units=None):
     """Generate one variable dict per pressure level."""
     v = [
         {
             "key": f"{base_key}_{lv}",
             "name": f"{base_name} at {lv} hPa",
-            "units": units,
-            "source": _pl_source(base_key, lv),
+            "source_units": source_units,
+            "source_variable": _pl_source(base_key, lv),
+            **({"output_units": output_units} if output_units else {}),
             **({"value_range": value_range} if value_range else {}),
         }
         for lv in _PRESSURE_LEVELS
@@ -74,49 +75,53 @@ COLLECTIONS = {
             {
                 "key": "2t",
                 "name": "2m Temperature",
-                "units": "K",
-                "source": _height("2t", 2),
-                "value_range": (213.0, 333.0),
+                "source_units": "K",
+                "output_units": "degC",
+                "source_variable": _height("2t", 2),
+                "value_range": (-60.0, 60.0),
             },
             {
                 "key": "10u",
                 "name": "10m U Wind Component",
-                "units": "m/s",
-                "source": _height("10u", 10),
+                "source_units": "m/s",
+                "source_variable": _height("10u", 10),
                 "value_range": (-80.0, 80.0),
             },
             {
                 "key": "10v",
                 "name": "10m V Wind Component",
-                "units": "m/s",
-                "source": _height("10v", 10),
+                "source_units": "m/s",
+                "source_variable": _height("10v", 10),
                 "value_range": (-80.0, 80.0),
             },
             {
                 "key": "msl",
                 "name": "Mean Sea Level Pressure",
-                "units": "Pa",
-                "source": "msl",
-                "value_range": (87000.0, 108000.0),
+                "source_units": "Pa",
+                "output_units": "hPa",
+                "source_variable": "msl",
+                "value_range": (870.0, 1080.0),
             },
             {
                 "key": "tp",
                 "name": "Total Precipitation",
-                "units": "m",
-                "source": "tp",
-                "value_range": (0.0, 0.5),
+                "source_units": "m",
+                "output_units": "mm",
+                "source_variable": "tp",
+                "value_range": (0.0, 500.0),
             },
             {
                 "key": "sp",
                 "name": "Surface Pressure",
-                "units": "Pa",
-                "source": "sp",
-                "value_range": (47000.0, 108000.0),
+                "source_units": "Pa",
+                "output_units": "hPa",
+                "source_variable": "sp",
+                "value_range": (470.0, 1080.0),
             },
             {
                 "key": "wind_speed_10m",
                 "name": "10m Wind Speed",
-                "units": "m/s",
+                "source_units": "m/s",
                 "transform": "vector_magnitude",
                 "components": {"u": _height("10u", 10), "v": _height("10v", 10)},
                 "value_range": (0.0, 80.0),
@@ -124,7 +129,7 @@ COLLECTIONS = {
             {
                 "key": "wind_dir_10m",
                 "name": "10m Wind Direction",
-                "units": "deg",
+                "source_units": "deg",
                 "transform": "vector_direction",
                 "components": {"u": _height("10u", 10), "v": _height("10v", 10)},
                 "value_range": (0.0, 360.0),
@@ -148,11 +153,11 @@ COLLECTIONS = {
         "time_resolution": "hourly",
         "is_forecast": True,
         "variables": [
-            *_pl_vars("t", "Temperature", "K", value_range=(173.0, 333.0)),
+            *_pl_vars("t", "Temperature", "K", value_range=(-100.0, 60.0), output_units="degC"),
             *_pl_vars("u", "U Wind Component", "m/s", value_range=(-120.0, 120.0)),
             *_pl_vars("v", "V Wind Component", "m/s", value_range=(-120.0, 120.0)),
-            *_pl_vars("z", "Geopotential", "m2 s-2"),
-            *_pl_vars("q", "Specific Humidity", "kg kg-1", value_range=(0.0, 0.04)),
+            *_pl_vars("z", "Geopotential Height", "m2 s-2", output_units="gpdam"),
+            *_pl_vars("q", "Specific Humidity", "kg kg-1", value_range=(0.0, 40.0), output_units="g kg-1"),
         ],
         "groups": [
             {

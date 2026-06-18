@@ -37,21 +37,24 @@ class ECMWFAIFSDataSource(BaseDataSource):
     # (Optional) informational only; selection uses URL existence checks
     AVAILABILITY_DELAY = 7
     
+    # source_units describes the RAW unit each field carries in the GRIB2 file.
+    # The output unit a Collection exposes (after conversion) lives in models.py
+    # COLLECTIONS, not here.
     SURFACE_VARIABLES = {
-        "2t": {"name": "2m Temperature", "units": "K", "grib_param": 167},
-        "10u": {"name": "10m U Wind", "units": "m/s", "grib_param": 165},
-        "10v": {"name": "10m V Wind", "units": "m/s", "grib_param": 166},
-        "msl": {"name": "Mean Sea Level Pressure", "units": "Pa", "grib_param": 151},
-        "tp": {"name": "Total Precipitation", "units": "m", "grib_param": 228},
-        "sp": {"name": "Surface Pressure", "units": "Pa", "grib_param": 134},
+        "2t": {"name": "2m Temperature", "source_units": "K", "grib_param": 167},
+        "10u": {"name": "10m U Wind", "source_units": "m/s", "grib_param": 165},
+        "10v": {"name": "10m V Wind", "source_units": "m/s", "grib_param": 166},
+        "msl": {"name": "Mean Sea Level Pressure", "source_units": "Pa", "grib_param": 151},
+        "tp": {"name": "Total Precipitation", "source_units": "m", "grib_param": 228},
+        "sp": {"name": "Surface Pressure", "source_units": "Pa", "grib_param": 134},
     }
-    
+
     PRESSURE_VARIABLES = {
-        "t": {"name": "Temperature", "units": "K", "grib_param": 130},
-        "u": {"name": "U Wind", "units": "m/s", "grib_param": 131},
-        "v": {"name": "V Wind", "units": "m/s", "grib_param": 132},
-        "z": {"name": "Geopotential", "units": "m²/s²", "grib_param": 129},
-        "q": {"name": "Specific Humidity", "units": "kg/kg", "grib_param": 133},
+        "t": {"name": "Temperature", "source_units": "K", "grib_param": 130},
+        "u": {"name": "U Wind", "source_units": "m/s", "grib_param": 131},
+        "v": {"name": "V Wind", "source_units": "m/s", "grib_param": 132},
+        "z": {"name": "Geopotential", "source_units": "m²/s²", "grib_param": 129},
+        "q": {"name": "Specific Humidity", "source_units": "kg/kg", "grib_param": 133},
     }
     
     PRESSURE_LEVELS = [1000, 925, 850, 700, 500, 300, 250, 200, 50]
