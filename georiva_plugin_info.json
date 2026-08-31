@@ -1,7 +1,7 @@
 {
-  "name": "GeoRiva ECMWF AIFS",
+  "name": "GeoRiva ECMWF Open Data",
   "version": "0.0.1",
-  "description": "GeoRiva source plugin for ECMWF AIFS (Artificial Intelligence Forecasting System) Open Data forecasts. Provides surface and pressure-level GRIB2 data feeds at 0.25 degrees, downloaded over HTTPS.",
+  "description": "GeoRiva source plugin for ECMWF Open Data forecasts (currently AIFS). Provides surface and pressure-level GRIB2 data feeds at 0.25 degrees, downloaded over HTTPS from data.ecmwf.int.",
   "author": "WMO RAF",
   "author_url": "https://github.com/wmo-raf",
   "url": "https://github.com/wmo-raf/georiva-source-ecmwf",

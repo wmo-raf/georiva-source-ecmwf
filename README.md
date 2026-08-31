@@ -1,4 +1,4 @@
-# GeoRiva ECMWF AIFS
+# GeoRiva ECMWF Open Data
 
 A [GeoRiva](https://github.com/wmo-raf/georiva) source plugin for the
 **ECMWF AIFS** (Artificial Intelligence Forecasting System) global forecast,
