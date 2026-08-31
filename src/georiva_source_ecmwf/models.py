@@ -11,7 +11,10 @@ from timezone_field import TimeZoneField
 from wagtail.admin.forms import WagtailAdminModelForm
 from wagtail.admin.panels import FieldPanel, MultiFieldPanel
 
-from georiva.sources.collection_definitions import CollectionDefinition, parse_collection_defs
+from georiva.sources.collection_definitions import (
+    CollectionDefinition,
+    parse_collection_defs,
+)
 from georiva.sources.models import DataFeed
 
 # ---------------------------------------------------------------------------
@@ -29,8 +32,8 @@ def _height(name, value):
             "type": "heightAboveGround",
             "value": value,
             "dimension": "heightAboveGround",
-            "unit": "m"
-        }
+            "unit": "m",
+        },
     }
 
 
@@ -42,8 +45,8 @@ def _pl_source(name, level):
             "type": "pressure",
             "value": level,
             "dimension": "isobaricInhPa",
-            "unit": "hPa"
-        }
+            "unit": "hPa",
+        },
     }
 
 
@@ -153,11 +156,19 @@ COLLECTIONS = {
         "time_resolution": "hourly",
         "is_forecast": True,
         "variables": [
-            *_pl_vars("t", "Temperature", "K", value_range=(-100.0, 60.0), output_units="degC"),
+            *_pl_vars(
+                "t", "Temperature", "K", value_range=(-100.0, 60.0), output_units="degC"
+            ),
             *_pl_vars("u", "U Wind Component", "m/s", value_range=(-120.0, 120.0)),
             *_pl_vars("v", "V Wind Component", "m/s", value_range=(-120.0, 120.0)),
             *_pl_vars("z", "Geopotential Height", "m2 s-2", output_units="gpdam"),
-            *_pl_vars("q", "Specific Humidity", "kg kg-1", value_range=(0.0, 40.0), output_units="g kg-1"),
+            *_pl_vars(
+                "q",
+                "Specific Humidity",
+                "kg kg-1",
+                value_range=(0.0, 40.0),
+                output_units="g kg-1",
+            ),
         ],
         "groups": [
             {
@@ -195,7 +206,7 @@ class ECMWFAIFSDataFeedForm(WagtailAdminModelForm):
         required=False,
         initial=[0, 12],
     )
-    
+
     def clean_run_hours(self):
         # Convert list of strings → list of ints for the ArrayField
         return [int(v) for v in self.cleaned_data.get("run_hours", [])]
@@ -208,33 +219,33 @@ class ECMWFAIFSDataFeed(DataFeed, TimeStampedModel):
       - Select forecast day range
       - Each day includes 4 timesteps: +0h, +6h, +12h, +18h
     """
-    
+
     base_form_class = ECMWFAIFSDataFeedForm
-    
+
     # Which runs to fetch from
     run_hours = ArrayField(
         models.IntegerField(choices=RUN_HOUR_CHOICES),
         default=default_run_hours,
         help_text="Which model runs to fetch from (e.g., 00Z and 12Z are most common)",
     )
-    
+
     # Forecast range
     start_day = models.IntegerField(
         default=0,
         validators=[MinValueValidator(0), MaxValueValidator(15)],
         help_text="Forecast start day (0 = analysis time)",
     )
-    
+
     end_day = models.IntegerField(
         default=5,
         validators=[MinValueValidator(0), MaxValueValidator(15)],
         help_text="Forecast end day (max 15)",
     )
-    
+
     display_timezone = TimeZoneField(
         default="Africa/Nairobi",
     )
-    
+
     panels = [
         *DataFeed.base_panels,
         MultiFieldPanel(
@@ -252,79 +263,84 @@ class ECMWFAIFSDataFeed(DataFeed, TimeStampedModel):
             heading="Forecast Range",
         ),
     ]
-    
+
     class Meta:
         verbose_name = "ECMWF AIFS Data Feed"
-    
+
     def clean(self):
         super().clean()
         if self.start_day > self.end_day:
             from django.core.exceptions import ValidationError
-            raise ValidationError({
-                "end_day": "End day must be greater than or equal to start day."
-            })
-    
+
+            raise ValidationError(
+                {"end_day": "End day must be greater than or equal to start day."}
+            )
+
     # ======================================================
     # Core logic
     # ======================================================
-    
+
     MAX_STEP = 360
     STEP_INTERVAL = 6
     HOURS_IN_DAY = [0, 6, 12, 18]
-    
+
     def get_run_hours(self):
         """Returns selected run hours, or all if none selected."""
         if self.run_hours:
             return sorted(self.run_hours)
         return [0, 6, 12, 18]  # Default to all runs
-    
+
     def compute_steps(self):
         """
         Convert day range → list of forecast step hours, capped at 360h.
-        
+
         Example:
             start_day=0, end_day=2 → [0, 6, 12, 18, 24, 30, 36, 42, 48, 54, 60, 66]
         """
         steps = []
-        
+
         for day in range(self.start_day, self.end_day + 1):
             base_hour = day * 24
             for hour_offset in self.HOURS_IN_DAY:
                 step = base_hour + hour_offset
                 if step <= self.MAX_STEP:
                     steps.append(step)
-        
+
         return steps
-    
+
     def valid_times(self, run_utc=None):
         """
         Returns user-friendly timestamps for each step.
         """
         if run_utc is None:
-            run_utc = timezone.now().replace(
-                hour=0, minute=0, second=0, microsecond=0
-            ).astimezone(ZoneInfo("UTC"))
-        
+            run_utc = (
+                timezone.now()
+                .replace(hour=0, minute=0, second=0, microsecond=0)
+                .astimezone(ZoneInfo("UTC"))
+            )
+
         tz = ZoneInfo(self.display_timezone)
-        
+
         output = []
         for step in self.compute_steps():
             valid_utc = run_utc + timedelta(hours=step)
             valid_local = valid_utc.astimezone(tz)
-            
-            output.append({
-                "step": step,
-                "valid_utc": valid_utc,
-                "valid_local": valid_local,
-                "label": f"{valid_local:%a %d %b %H:%M} (T+{step}h)",
-            })
-        
+
+            output.append(
+                {
+                    "step": step,
+                    "valid_utc": valid_utc,
+                    "valid_local": valid_local,
+                    "label": f"{valid_local:%a %d %b %H:%M} (T+{step}h)",
+                }
+            )
+
         return output
-    
+
     def __str__(self):
         runs = ", ".join(f"{h:02d}Z" for h in self.get_run_hours())
         return f"{self.name} ({runs}, Day {self.start_day}–{self.end_day})"
-    
+
     @classmethod
     def get_wizard_defaults(cls) -> dict:
         return {
@@ -332,7 +348,7 @@ class ECMWFAIFSDataFeed(DataFeed, TimeStampedModel):
             "start_day": 0,
             "end_day": 5,
         }
-    
+
     @classmethod
     def get_catalog_defaults(cls) -> dict:
         return {
@@ -340,16 +356,17 @@ class ECMWFAIFSDataFeed(DataFeed, TimeStampedModel):
             "file_format": "grib2",
             "description": "ECMWF AIFS global forecast — 0.25° resolution, 6-hourly steps.",
         }
-    
+
     @classmethod
     def get_collection_definitions(cls) -> list[CollectionDefinition]:
         return parse_collection_defs(COLLECTIONS)
-    
+
     @property
     def data_source_cls(self):
         from .source import ECMWFAIFSDataSource
+
         return ECMWFAIFSDataSource
-    
+
     def get_loader_config(self):
         """Get loader configuration dictionary."""
         return {
