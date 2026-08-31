@@ -8,6 +8,7 @@ request generation).
 
 from .base import ECMWFOpenDataSource
 from .collection_specs import IFS_PRESSURE_LEVELS
+from .steps import THREE_HOURLY_MAX_STEP
 
 
 class ECMWFAIFSDataSource(ECMWFOpenDataSource):
@@ -94,3 +95,12 @@ class ECMWFIFSDataSource(ECMWFOpenDataSource):
 
     def default_pressure_levels(self) -> list[int]:
         return list(self.PRESSURE_LEVELS)
+
+    def is_valid_step(self, step: int) -> bool:
+        """
+        The portal's piecewise oper cadence: 3-hourly steps exist only up
+        to 144h; beyond that only 6-hourly steps (to 360h).
+        """
+        if step <= THREE_HOURLY_MAX_STEP:
+            return step % 3 == 0
+        return step % 6 == 0

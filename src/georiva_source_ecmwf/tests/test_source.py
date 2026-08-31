@@ -184,9 +184,36 @@ class IFSGenerateRequestsTest(FrozenClockTestCase):
         self.assertEqual(requests_out[1].expected_format, "grib")
 
     def test_off_cadence_and_out_of_range_steps_are_skipped(self):
+        # 3h is a published oper step (3-hourly to 144h); 2h never is,
+        # and steps outside 0..360h are dropped regardless of cadence.
         source = _make_source(
             cls=ECMWFIFSDataSource,
-            config={"forecast_hours": [0, 3, 6, 366, -6], "run_hours": [0]},
+            config={"forecast_hours": [0, 2, 3, 6, 366, -6], "run_hours": [0]},
+            ok_substrings=[f"/{self.date_folder}/00z/"],
+        )
+
+        steps = [r.params["step_hours"] for r in source.generate_requests()]
+
+        self.assertEqual(steps, [0, 3, 6])
+
+    def test_three_hourly_steps_are_valid_only_up_to_144h(self):
+        # The portal's piecewise rule: 3-hourly to 144h, 6-hourly beyond.
+        source = _make_source(
+            cls=ECMWFIFSDataSource,
+            config={
+                "forecast_hours": [138, 141, 144, 147, 150, 153, 156],
+                "run_hours": [0],
+            },
+            ok_substrings=[f"/{self.date_folder}/00z/"],
+        )
+
+        steps = [r.params["step_hours"] for r in source.generate_requests()]
+
+        self.assertEqual(steps, [138, 141, 144, 150, 156])
+
+    def test_aifs_cadence_is_unchanged_six_hourly(self):
+        source = _make_source(
+            config={"forecast_hours": [0, 3, 6], "run_hours": [0]},
             ok_substrings=[f"/{self.date_folder}/00z/"],
         )
 

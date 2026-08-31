@@ -18,7 +18,7 @@ from georiva.sources.collection_definitions import (
 from georiva.sources.models import DataFeed
 
 from .collection_specs import AIFS_COLLECTIONS, IFS_COLLECTIONS
-from .steps import six_hourly_steps
+from .steps import ifs_steps, six_hourly_steps
 
 # Kept under its historical name: the AIFS spec predates the IFS feed.
 COLLECTIONS = AIFS_COLLECTIONS
@@ -203,6 +203,11 @@ IFS_RUN_HOUR_CHOICES = [
     (12, "12Z"),
 ]
 
+IFS_STEP_INTERVAL_CHOICES = [
+    (3, "3-hourly (6-hourly beyond 144h)"),
+    (6, "6-hourly"),
+]
+
 
 def default_ifs_run_hours():
     return [0, 12]
@@ -227,7 +232,8 @@ class ECMWFIFSDataFeed(DataFeed, TimeStampedModel):
       - Select which model runs to fetch from — only 00Z and 12Z, the
         cycles the `oper` stream serves out to 360h
       - Select forecast day range (0-15)
-      - Steps are 6-hourly in this slice: +0h, +6h, +12h, +18h per day
+      - Choose a 3-hourly or 6-hourly step cadence; 3-hourly exists only
+        up to 144h, beyond which the feed continues 6-hourly to 360h
     """
 
     base_form_class = ECMWFIFSDataFeedForm
@@ -252,6 +258,15 @@ class ECMWFIFSDataFeed(DataFeed, TimeStampedModel):
         help_text="Forecast end day (max 15)",
     )
 
+    step_interval = models.IntegerField(
+        choices=IFS_STEP_INTERVAL_CHOICES,
+        default=6,
+        help_text=(
+            "Forecast step cadence. The portal serves 3-hourly steps only "
+            "up to 144h; a 3-hourly feed continues 6-hourly beyond that."
+        ),
+    )
+
     display_timezone = TimeZoneField(
         default="Africa/Nairobi",
     )
@@ -268,6 +283,7 @@ class ECMWFIFSDataFeed(DataFeed, TimeStampedModel):
             [
                 FieldPanel("start_day"),
                 FieldPanel("end_day"),
+                FieldPanel("step_interval"),
                 FieldPanel("display_timezone"),
             ],
             heading="Forecast Range",
@@ -293,8 +309,12 @@ class ECMWFIFSDataFeed(DataFeed, TimeStampedModel):
         return [0, 12]
 
     def compute_steps(self):
-        """Convert day range -> list of forecast step hours, capped at 360h."""
-        return six_hourly_steps(self.start_day, self.end_day)
+        """
+        Convert day range -> list of forecast step hours at the feed's
+        cadence, capped at 360h. 3-hourly cadence drops to 6-hourly past
+        144h — the portal publishes nothing finer there.
+        """
+        return ifs_steps(self.start_day, self.end_day, self.step_interval)
 
     def valid_times(self, run_utc=None):
         """Returns user-friendly timestamps for each step."""
@@ -333,6 +353,7 @@ class ECMWFIFSDataFeed(DataFeed, TimeStampedModel):
             "run_hours": [0, 12],
             "start_day": 0,
             "end_day": 5,
+            "step_interval": 6,
         }
 
     @classmethod
