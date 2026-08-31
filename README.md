@@ -1,30 +1,40 @@
 # GeoRiva ECMWF Open Data
 
-A [GeoRiva](https://github.com/wmo-raf/georiva) source plugin for the
-**ECMWF AIFS** (Artificial Intelligence Forecasting System) global forecast,
-served as Open Data over HTTPS.
+A [GeoRiva](https://github.com/wmo-raf/georiva) source plugin for ECMWF's
+Open Data global forecasts, served over HTTPS: **AIFS** (Artificial
+Intelligence Forecasting System) and **IFS** (the physics-based Integrated
+Forecasting System, deterministic `oper` stream).
 
 It ships:
 
-- **`ECMWFAIFSDataSource`** — generates download requests for the latest
-  published AIFS-single run (today, falling back to yesterday) from
+- **`ECMWFAIFSDataSource`** / **`ECMWFIFSDataSource`** — thin subclasses of a
+  shared `ECMWFOpenDataSource` base that generates download requests for the
+  latest published run (today, falling back to yesterday) from
   `https://data.ecmwf.int/forecasts`, over plain HTTPS (`HTTPFetchStrategy`).
   One GRIB2 file is fetched per forecast step; the file holds many variables,
   which are carried as metadata for downstream extraction.
-- **`ECMWFAIFSDataFeed`** — a DataFeed with two collections (surface variables
-  and pressure-level variables) at 0.25° resolution. The operator chooses which
-  model runs (00/06/12/18Z) to fetch and the forecast day range.
+- **`ECMWFAIFSDataFeed`** / **`ECMWFIFSDataFeed`** — DataFeeds with two
+  collections each (surface variables and pressure-level variables) at 0.25°
+  resolution. The operator chooses which model runs to fetch — 00/06/12/18Z
+  for AIFS, 00/12Z for IFS (the cycles `oper` serves out to 360h) — and the
+  forecast day range.
+
+The two models share a variable core — identical keys and output units for
+2m temperature, 10m wind (components, speed, direction), MSL/surface
+pressure, total precipitation, and t/u/v/z/q on the pressure levels — so
+AIFS and IFS layers render comparably side by side.
 
 ## Data model
 
 | Concept | Maps to |
 | --- | --- |
-| Collection | a variable group — Surface or Pressure Levels |
-| DataFeed | the runs to fetch (00/06/12/18Z) + forecast day range + display timezone |
-| Variable | an AIFS field (e.g. `2t`, `tp`, `t_850`), plus derived wind speed/direction |
+| Collection | a variable group — Surface or Pressure Levels (per model) |
+| DataFeed | the runs to fetch + forecast day range + display timezone |
+| Variable | a model field (e.g. `2t`, `tp`, `t_850`), plus derived wind speed/direction |
 
-The feed converts its day range into 6-hourly forecast steps (capped at 360h /
-15 days) and exposes only the latest published run on each acquisition.
+Each feed converts its day range into 6-hourly forecast steps (capped at
+360h / 15 days) and exposes only the latest published run on each
+acquisition.
 
 ## No credentials required
 
@@ -47,5 +57,6 @@ empty).
   `make dev-makemigrations && make dev-migrate`.
 
 Then in the GeoRiva admin, open **Automated Sources → Set up wizard**, choose
-**ECMWF AIFS Data Feed**, pick the runs and forecast range, and select the
-collections (surface / pressure levels) to provision.
+**ECMWF AIFS Data Feed** or **ECMWF IFS Data Feed**, pick the runs and
+forecast range, and select the collections (surface / pressure levels) to
+provision.

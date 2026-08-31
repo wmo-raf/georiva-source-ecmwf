@@ -116,10 +116,6 @@ class ECMWFAIFSDataFeed(DataFeed, TimeStampedModel):
     # Core logic
     # ======================================================
 
-    MAX_STEP = 360
-    STEP_INTERVAL = 6
-    HOURS_IN_DAY = [0, 6, 12, 18]
-
     def get_run_hours(self):
         """Returns selected run hours, or all if none selected."""
         if self.run_hours:
@@ -133,16 +129,7 @@ class ECMWFAIFSDataFeed(DataFeed, TimeStampedModel):
         Example:
             start_day=0, end_day=2 → [0, 6, 12, 18, 24, 30, 36, 42, 48, 54, 60, 66]
         """
-        steps = []
-
-        for day in range(self.start_day, self.end_day + 1):
-            base_hour = day * 24
-            for hour_offset in self.HOURS_IN_DAY:
-                step = base_hour + hour_offset
-                if step <= self.MAX_STEP:
-                    steps.append(step)
-
-        return steps
+        return six_hourly_steps(self.start_day, self.end_day)
 
     def valid_times(self, run_utc=None):
         """
@@ -155,7 +142,7 @@ class ECMWFAIFSDataFeed(DataFeed, TimeStampedModel):
                 .astimezone(ZoneInfo("UTC"))
             )
 
-        tz = ZoneInfo(self.display_timezone)
+        tz = ZoneInfo(str(self.display_timezone))
 
         output = []
         for step in self.compute_steps():
@@ -318,7 +305,7 @@ class ECMWFIFSDataFeed(DataFeed, TimeStampedModel):
                 .astimezone(ZoneInfo("UTC"))
             )
 
-        tz = ZoneInfo(self.display_timezone)
+        tz = ZoneInfo(str(self.display_timezone))
 
         output = []
         for step in self.compute_steps():
