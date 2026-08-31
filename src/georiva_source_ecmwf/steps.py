@@ -14,6 +14,16 @@ HOURS_IN_DAY = (0, 6, 12, 18)
 THREE_HOURLY_MAX_STEP = 144
 
 
+def is_published_ifs_step(step):
+    """
+    Whether the portal publishes this IFS oper step: 3-hourly up to 144h,
+    6-hourly beyond. (Range clamping to 0..360h is the caller's concern.)
+    """
+    if step <= THREE_HOURLY_MAX_STEP:
+        return step % 3 == 0
+    return step % 6 == 0
+
+
 def six_hourly_steps(start_day, end_day, max_step=MAX_STEP):
     """
     Step hours for an inclusive forecast day range at 6-hourly cadence,
@@ -50,7 +60,7 @@ def ifs_steps(start_day, end_day, step_interval=6, max_step=MAX_STEP):
             step = day * 24 + hour_offset
             if step > max_step:
                 continue
-            if step > THREE_HOURLY_MAX_STEP and step % 6:
+            if not is_published_ifs_step(step):
                 continue
             steps.append(step)
     return steps

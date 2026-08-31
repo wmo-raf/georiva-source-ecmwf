@@ -211,6 +211,34 @@ class IFSGenerateRequestsTest(FrozenClockTestCase):
 
         self.assertEqual(steps, [138, 141, 144, 150, 156])
 
+    def test_three_hourly_feed_emits_extra_urls_below_144h_only(self):
+        # Drive the source with a 3-hourly feed's computed steps — the same
+        # wiring get_loader_config() uses — across the 144h boundary
+        # (days 5-6) and check the URLs it emits.
+        from georiva_source_ecmwf.steps import ifs_steps
+
+        source = _make_source(
+            cls=ECMWFIFSDataSource,
+            config={"forecast_hours": ifs_steps(5, 6, 3), "run_hours": [0]},
+            ok_substrings=[f"/{self.date_folder}/00z/"],
+        )
+
+        urls = [r.params["url"] for r in source.generate_requests()]
+
+        base = (
+            "https://data.ecmwf.int/forecasts"
+            f"/{self.date_folder}/00z/ifs/0p25/oper/{self.date_folder}000000"
+        )
+        # Extra 3-hourly URLs below 144h...
+        self.assertIn(f"{base}-123h-oper-fc.grib2", urls)
+        self.assertIn(f"{base}-141h-oper-fc.grib2", urls)
+        # ...144h is the last of them, then only 6-hourly URLs beyond.
+        self.assertIn(f"{base}-144h-oper-fc.grib2", urls)
+        self.assertNotIn(f"{base}-147h-oper-fc.grib2", urls)
+        self.assertIn(f"{base}-150h-oper-fc.grib2", urls)
+        self.assertIn(f"{base}-162h-oper-fc.grib2", urls)
+        self.assertNotIn(f"{base}-165h-oper-fc.grib2", urls)
+
     def test_aifs_cadence_is_unchanged_six_hourly(self):
         source = _make_source(
             config={"forecast_hours": [0, 3, 6], "run_hours": [0]},
