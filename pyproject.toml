@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "georiva-source-ecmwf"
 version = "0.0.1"
-description = "GeoRiva source plugin for ECMWF Open Data forecasts (surface + pressure-level GRIB2; currently AIFS)."
+description = "GeoRiva source plugin for ECMWF Open Data forecasts (surface + pressure-level GRIB2; AIFS and IFS)."
 requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [{ name = "WMO RAF" }]

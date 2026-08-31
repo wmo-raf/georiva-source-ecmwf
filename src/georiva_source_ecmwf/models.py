@@ -17,175 +17,11 @@ from georiva.sources.collection_definitions import (
 )
 from georiva.sources.models import DataFeed
 
-# ---------------------------------------------------------------------------
-# ECMWF AIFS collection definitions
-# ---------------------------------------------------------------------------
+from .collection_specs import AIFS_COLLECTIONS, IFS_COLLECTIONS
+from .steps import six_hourly_steps
 
-_PRESSURE_LEVELS = [1000, 925, 850, 700, 500, 300, 250, 200, 50]
-
-
-def _height(name, value):
-    """Source dict for a height-above-ground level."""
-    return {
-        "name": name,
-        "level": {
-            "type": "heightAboveGround",
-            "value": value,
-            "dimension": "heightAboveGround",
-            "unit": "m",
-        },
-    }
-
-
-def _pl_source(name, level):
-    """Source dict for a pressure level."""
-    return {
-        "name": name,
-        "level": {
-            "type": "pressure",
-            "value": level,
-            "dimension": "isobaricInhPa",
-            "unit": "hPa",
-        },
-    }
-
-
-def _pl_vars(base_key, base_name, source_units, value_range=None, output_units=None):
-    """Generate one variable dict per pressure level."""
-    v = [
-        {
-            "key": f"{base_key}_{lv}",
-            "name": f"{base_name} at {lv} hPa",
-            "source_units": source_units,
-            "source_variable": _pl_source(base_key, lv),
-            **({"output_units": output_units} if output_units else {}),
-            **({"value_range": value_range} if value_range else {}),
-        }
-        for lv in _PRESSURE_LEVELS
-    ]
-    return v
-
-
-# ---------------------------------------------------------------------------
-# Raw collection spec — the canonical source of truth for this plugin.
-# ---------------------------------------------------------------------------
-COLLECTIONS = {
-    "ecmwf-aifs-surface": {
-        "name": "Surface Variables",
-        "time_resolution": "hourly",
-        "is_forecast": True,
-        "variables": [
-            {
-                "key": "2t",
-                "name": "2m Temperature",
-                "source_units": "K",
-                "output_units": "degC",
-                "source_variable": _height("2t", 2),
-                "value_range": (-60.0, 60.0),
-            },
-            {
-                "key": "10u",
-                "name": "10m U Wind Component",
-                "source_units": "m/s",
-                "source_variable": _height("10u", 10),
-                "value_range": (-80.0, 80.0),
-            },
-            {
-                "key": "10v",
-                "name": "10m V Wind Component",
-                "source_units": "m/s",
-                "source_variable": _height("10v", 10),
-                "value_range": (-80.0, 80.0),
-            },
-            {
-                "key": "msl",
-                "name": "Mean Sea Level Pressure",
-                "source_units": "Pa",
-                "output_units": "hPa",
-                "source_variable": "msl",
-                "value_range": (870.0, 1080.0),
-            },
-            {
-                "key": "tp",
-                "name": "Total Precipitation",
-                "source_units": "m",
-                "output_units": "mm",
-                "source_variable": "tp",
-                "value_range": (0.0, 500.0),
-            },
-            {
-                "key": "sp",
-                "name": "Surface Pressure",
-                "source_units": "Pa",
-                "output_units": "hPa",
-                "source_variable": "sp",
-                "value_range": (470.0, 1080.0),
-            },
-            {
-                "key": "wind_speed_10m",
-                "name": "10m Wind Speed",
-                "source_units": "m/s",
-                "transform": "vector_magnitude",
-                "components": {"u": _height("10u", 10), "v": _height("10v", 10)},
-                "value_range": (0.0, 80.0),
-            },
-            {
-                "key": "wind_dir_10m",
-                "name": "10m Wind Direction",
-                "source_units": "deg",
-                "transform": "vector_direction",
-                "components": {"u": _height("10u", 10), "v": _height("10v", 10)},
-                "value_range": (0.0, 360.0),
-            },
-        ],
-        "groups": [
-            {
-                "key": "temp-pressure",
-                "name": "Temperature & Pressure",
-                "variable_keys": ["2t", "msl", "sp", "tp"],
-            },
-            {
-                "key": "wind",
-                "name": "10m Wind",
-                "variable_keys": ["10u", "10v", "wind_speed_10m", "wind_dir_10m"],
-            },
-        ],
-    },
-    "ecmwf-aifs-pressure-levels": {
-        "name": "Pressure Level Variables",
-        "time_resolution": "hourly",
-        "is_forecast": True,
-        "variables": [
-            *_pl_vars(
-                "t", "Temperature", "K", value_range=(-100.0, 60.0), output_units="degC"
-            ),
-            *_pl_vars("u", "U Wind Component", "m/s", value_range=(-120.0, 120.0)),
-            *_pl_vars("v", "V Wind Component", "m/s", value_range=(-120.0, 120.0)),
-            *_pl_vars("z", "Geopotential Height", "m2 s-2", output_units="gpdam"),
-            *_pl_vars(
-                "q",
-                "Specific Humidity",
-                "kg kg-1",
-                value_range=(0.0, 40.0),
-                output_units="g kg-1",
-            ),
-        ],
-        "groups": [
-            {
-                "key": f"pl-{lv}",
-                "name": f"{lv} hPa",
-                "variable_keys": [
-                    f"t_{lv}",
-                    f"u_{lv}",
-                    f"v_{lv}",
-                    f"z_{lv}",
-                    f"q_{lv}",
-                ],
-            }
-            for lv in _PRESSURE_LEVELS
-        ],
-    },
-}
+# Kept under its historical name: the AIFS spec predates the IFS feed.
+COLLECTIONS = AIFS_COLLECTIONS
 
 RUN_HOUR_CHOICES = [
     (0, "00Z"),
@@ -359,13 +195,176 @@ class ECMWFAIFSDataFeed(DataFeed, TimeStampedModel):
 
     @classmethod
     def get_collection_definitions(cls) -> list[CollectionDefinition]:
-        return parse_collection_defs(COLLECTIONS)
+        return parse_collection_defs(AIFS_COLLECTIONS)
 
     @property
     def data_source_cls(self):
         from .source import ECMWFAIFSDataSource
 
         return ECMWFAIFSDataSource
+
+    def get_loader_config(self):
+        """Get loader configuration dictionary."""
+        return {
+            "run_hours": self.get_run_hours(),
+            "forecast_hours": self.compute_steps(),
+        }
+
+
+IFS_RUN_HOUR_CHOICES = [
+    (0, "00Z"),
+    (12, "12Z"),
+]
+
+
+def default_ifs_run_hours():
+    return [0, 12]
+
+
+class ECMWFIFSDataFeedForm(WagtailAdminModelForm):
+    run_hours = forms.MultipleChoiceField(
+        choices=IFS_RUN_HOUR_CHOICES,
+        widget=forms.CheckboxSelectMultiple,
+        required=False,
+        initial=[0, 12],
+    )
+
+    def clean_run_hours(self):
+        # Convert list of strings -> list of ints for the ArrayField
+        return [int(v) for v in self.cleaned_data.get("run_hours", [])]
+
+
+class ECMWFIFSDataFeed(DataFeed, TimeStampedModel):
+    """
+    ECMWF IFS (deterministic `oper` stream) feed:
+      - Select which model runs to fetch from — only 00Z and 12Z, the
+        cycles the `oper` stream serves out to 360h
+      - Select forecast day range (0-15)
+      - Steps are 6-hourly in this slice: +0h, +6h, +12h, +18h per day
+    """
+
+    base_form_class = ECMWFIFSDataFeedForm
+
+    # Which runs to fetch from
+    run_hours = ArrayField(
+        models.IntegerField(choices=IFS_RUN_HOUR_CHOICES),
+        default=default_ifs_run_hours,
+        help_text="Which model runs to fetch from (the oper stream serves 00Z and 12Z out to 360h)",
+    )
+
+    # Forecast range
+    start_day = models.IntegerField(
+        default=0,
+        validators=[MinValueValidator(0), MaxValueValidator(15)],
+        help_text="Forecast start day (0 = analysis time)",
+    )
+
+    end_day = models.IntegerField(
+        default=5,
+        validators=[MinValueValidator(0), MaxValueValidator(15)],
+        help_text="Forecast end day (max 15)",
+    )
+
+    display_timezone = TimeZoneField(
+        default="Africa/Nairobi",
+    )
+
+    panels = [
+        *DataFeed.base_panels,
+        MultiFieldPanel(
+            [
+                FieldPanel("run_hours"),
+            ],
+            heading="Model Runs",
+        ),
+        MultiFieldPanel(
+            [
+                FieldPanel("start_day"),
+                FieldPanel("end_day"),
+                FieldPanel("display_timezone"),
+            ],
+            heading="Forecast Range",
+        ),
+    ]
+
+    class Meta:
+        verbose_name = "ECMWF IFS Data Feed"
+
+    def clean(self):
+        super().clean()
+        if self.start_day > self.end_day:
+            from django.core.exceptions import ValidationError
+
+            raise ValidationError(
+                {"end_day": "End day must be greater than or equal to start day."}
+            )
+
+    def get_run_hours(self):
+        """Returns selected run hours, or both oper cycles if none selected."""
+        if self.run_hours:
+            return sorted(self.run_hours)
+        return [0, 12]
+
+    def compute_steps(self):
+        """Convert day range -> list of forecast step hours, capped at 360h."""
+        return six_hourly_steps(self.start_day, self.end_day)
+
+    def valid_times(self, run_utc=None):
+        """Returns user-friendly timestamps for each step."""
+        if run_utc is None:
+            run_utc = (
+                timezone.now()
+                .replace(hour=0, minute=0, second=0, microsecond=0)
+                .astimezone(ZoneInfo("UTC"))
+            )
+
+        tz = ZoneInfo(self.display_timezone)
+
+        output = []
+        for step in self.compute_steps():
+            valid_utc = run_utc + timedelta(hours=step)
+            valid_local = valid_utc.astimezone(tz)
+
+            output.append(
+                {
+                    "step": step,
+                    "valid_utc": valid_utc,
+                    "valid_local": valid_local,
+                    "label": f"{valid_local:%a %d %b %H:%M} (T+{step}h)",
+                }
+            )
+
+        return output
+
+    def __str__(self):
+        runs = ", ".join(f"{h:02d}Z" for h in self.get_run_hours())
+        return f"{self.name} ({runs}, Day {self.start_day}–{self.end_day})"
+
+    @classmethod
+    def get_wizard_defaults(cls) -> dict:
+        return {
+            "run_hours": [0, 12],
+            "start_day": 0,
+            "end_day": 5,
+        }
+
+    @classmethod
+    def get_catalog_defaults(cls) -> dict:
+        return {
+            "name": "ECMWF IFS",
+            "file_format": "grib2",
+            "description": "ECMWF IFS global deterministic forecast — 0.25° resolution, 6-hourly steps.",
+        }
+
+    @classmethod
+    def get_collection_definitions(cls) -> list[CollectionDefinition]:
+        return parse_collection_defs(IFS_COLLECTIONS)
+
+    @property
+    def data_source_cls(self):
+        from .source import ECMWFIFSDataSource
+
+        return ECMWFIFSDataSource
 
     def get_loader_config(self):
         """Get loader configuration dictionary."""
