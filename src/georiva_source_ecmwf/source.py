@@ -1,5 +1,5 @@
 """
-ECMWF AIFS Data Source (Open Data / HTTPS)
+ECMWF Open Data sources (HTTPS): AIFS and IFS
 
 Thin declarative subclass of ECMWFOpenDataSource — see base.py for the
 portal mechanics (run-stamp, URL building, probing, latest-run fallback,
@@ -7,6 +7,7 @@ request generation).
 """
 
 from .base import ECMWFOpenDataSource
+from .collection_specs import IFS_PRESSURE_LEVELS
 
 
 class ECMWFAIFSDataSource(ECMWFOpenDataSource):
@@ -57,3 +58,39 @@ class ECMWFAIFSDataSource(ECMWFOpenDataSource):
 
     def default_pressure_levels(self) -> list[int]:
         return self.PRESSURE_LEVELS
+
+
+class ECMWFIFSDataSource(ECMWFOpenDataSource):
+    """
+    Data source for ECMWF IFS (Integrated Forecasting System), the
+    physics-based deterministic model — `oper` stream, Open Data HTTPS.
+
+    Only the 00Z and 12Z cycles are served: the portal's 06Z/18Z cycles
+    belong to the short-cutoff `scda` stream, which is out of scope.
+    Fetching is whole-file in this slice.
+    """
+
+    type = "ecmwf-ifs"
+    label = "ECMWF IFS"
+
+    MODEL_PATH = "ifs"
+    STREAM = "oper"
+    SLUG = "ifs"
+
+    CYCLES = [0, 12]
+    MAX_FORECAST_HOUR = 360
+    FORECAST_STEP = 6
+
+    PRESSURE_LEVELS = IFS_PRESSURE_LEVELS
+
+    @property
+    def name(self) -> str:
+        return "ECMWF IFS"
+
+    def default_variables(self) -> list[str]:
+        # The directly-readable surface shared core (derived wind
+        # variables are computed downstream, not fetched).
+        return ["2t", "10u", "10v", "msl", "tp", "sp"]
+
+    def default_pressure_levels(self) -> list[int]:
+        return list(self.PRESSURE_LEVELS)

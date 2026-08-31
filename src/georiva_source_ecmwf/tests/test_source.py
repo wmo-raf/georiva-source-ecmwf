@@ -10,7 +10,7 @@ import unittest
 from datetime import datetime, timedelta, timezone
 from unittest import mock
 
-from georiva_source_ecmwf.source import ECMWFAIFSDataSource
+from georiva_source_ecmwf.source import ECMWFAIFSDataSource, ECMWFIFSDataSource
 
 FROZEN_NOW = datetime(2026, 8, 15, 14, 30, tzinfo=timezone.utc)
 
@@ -41,8 +41,8 @@ class _FakeSession:
         return _FakeResponse(200 if ok else 404)
 
 
-def _make_source(config=None, ok_substrings=()):
-    source = ECMWFAIFSDataSource(config or {})
+def _make_source(config=None, ok_substrings=(), cls=ECMWFAIFSDataSource):
+    source = cls(config or {})
     source._http = _FakeSession(ok_substrings)
     return source
 
@@ -155,6 +155,80 @@ class LatestRunSelectionTest(FrozenClockTestCase):
             f"/{self.date_folder}/05z/",
             "".join(source._http.head_urls),
         )
+
+
+class IFSGenerateRequestsTest(FrozenClockTestCase):
+    def test_request_urls_follow_ifs_open_data_layout(self):
+        source = _make_source(
+            cls=ECMWFIFSDataSource,
+            config={"forecast_hours": [0, 6], "run_hours": [0, 12]},
+            ok_substrings=[f"/{self.date_folder}/12z/"],
+        )
+
+        requests_out = list(source.generate_requests())
+
+        self.assertEqual(len(requests_out), 2)
+        run_stamp = "20260815120000"
+        self.assertEqual(
+            requests_out[0].params["url"],
+            "https://data.ecmwf.int/forecasts"
+            "/20260815/12z/ifs/0p25/oper/20260815120000-0h-oper-fc.grib2",
+        )
+        self.assertEqual(
+            requests_out[1].params["url"],
+            "https://data.ecmwf.int/forecasts"
+            "/20260815/12z/ifs/0p25/oper/20260815120000-6h-oper-fc.grib2",
+        )
+        self.assertEqual(requests_out[0].identifier, f"ifs-open-{run_stamp}-0h")
+        self.assertEqual(requests_out[1].filename, f"ifs_{run_stamp}_6h_oper_fc.grib2")
+        self.assertEqual(requests_out[1].expected_format, "grib")
+
+    def test_off_cadence_and_out_of_range_steps_are_skipped(self):
+        source = _make_source(
+            cls=ECMWFIFSDataSource,
+            config={"forecast_hours": [0, 3, 6, 366, -6], "run_hours": [0]},
+            ok_substrings=[f"/{self.date_folder}/00z/"],
+        )
+
+        steps = [r.params["step_hours"] for r in source.generate_requests()]
+
+        self.assertEqual(steps, [0, 6])
+
+    def test_falls_back_to_yesterday_when_today_unpublished(self):
+        source = _make_source(
+            cls=ECMWFIFSDataSource,
+            config={"forecast_hours": [0], "run_hours": [0, 12]},
+            ok_substrings=["/20260814/12z/"],
+        )
+
+        (request,) = list(source.generate_requests())
+
+        self.assertEqual(
+            request.params["url"],
+            "https://data.ecmwf.int/forecasts"
+            "/20260814/12z/ifs/0p25/oper/20260814120000-0h-oper-fc.grib2",
+        )
+
+
+class IFSCycleRestrictionTest(FrozenClockTestCase):
+    def test_only_00z_and_12z_cycles_are_considered(self):
+        # 06z/18z belong to the scda stream, which oper does not serve to
+        # 360h: they must never be probed, even when configured.
+        source = _make_source(
+            cls=ECMWFIFSDataSource,
+            config={"run_hours": [0, 6, 12, 18]},
+            ok_substrings=[f"/{self.date_folder}/18z/"],
+        )
+
+        self.assertIsNone(source.get_latest_available_run())
+        probed = "".join(source._http.head_urls)
+        self.assertNotIn("/06z/", probed)
+        self.assertNotIn("/18z/", probed)
+
+    def test_default_run_hours_are_00z_and_12z(self):
+        source = _make_source(cls=ECMWFIFSDataSource)
+
+        self.assertEqual(source.run_hours, [0, 12])
 
 
 if __name__ == "__main__":
