@@ -86,9 +86,24 @@ class ECMWFIFSDataSource(ECMWFOpenDataSource):
     MAX_FORECAST_HOUR = 360
     FORECAST_STEP = 6
 
-    # The directly-readable surface shared core (derived wind variables
-    # are computed downstream, not fetched).
-    SURFACE_PARAMS = ["2t", "10u", "10v", "msl", "tp", "sp"]
+    # The directly-readable surface params, in `.index` naming: the
+    # shared core (derived wind variables are computed downstream, not
+    # fetched) plus the IFS-only variables — note CAPE is published as
+    # "mucape" (most-unstable CAPE).
+    SURFACE_PARAMS = [
+        "2t",
+        "10u",
+        "10v",
+        "msl",
+        "tp",
+        "sp",
+        "mucape",
+        "ptype",
+        "10fg",
+        "2d",
+        "tcwv",
+        "ssrd",
+    ]
 
     # The pressure-level shared core, one message per param per level.
     PRESSURE_PARAMS = ["t", "u", "v", "z", "q"]
@@ -129,8 +144,7 @@ class ECMWFIFSDataSource(ECMWFOpenDataSource):
             # ADR 0001: a message never selected is never staged, and
             # re-fetching history cannot recover it — make the drop loud.
             self.logger.warning(
-                f"Requested variables {dropped} are not fetchable surface "
-                f"params; they will not be in the staged subset"
+                f"Requested variables {dropped} are not fetchable surface params; they will not be in the staged subset"
             )
         if surface:
             selectors.append({"levtype": "sfc", "params": surface})

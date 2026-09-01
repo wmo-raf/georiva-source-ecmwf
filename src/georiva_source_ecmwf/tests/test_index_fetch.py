@@ -298,7 +298,7 @@ class SourceWiringTest(unittest.TestCase):
             latest.return_value = datetime(2026, 8, 31, tzinfo=timezone.utc)
             return list(source.generate_requests())
 
-    def test_ifs_requests_carry_shared_core_selectors(self):
+    def test_ifs_requests_carry_shared_core_and_ifs_only_selectors(self):
         from georiva_source_ecmwf.source import ECMWFIFSDataSource
 
         (request,) = self._requests_for(ECMWFIFSDataSource)
@@ -306,13 +306,56 @@ class SourceWiringTest(unittest.TestCase):
         selectors = request.params["index_selectors"]
         self.assertEqual(
             selectors[0],
-            {"levtype": "sfc", "params": ["2t", "10u", "10v", "msl", "tp", "sp"]},
+            {
+                "levtype": "sfc",
+                "params": [
+                    "2t",
+                    "10u",
+                    "10v",
+                    "msl",
+                    "tp",
+                    "sp",
+                    "mucape",
+                    "ptype",
+                    "10fg",
+                    "2d",
+                    "tcwv",
+                    "ssrd",
+                ],
+            },
         )
         self.assertEqual(selectors[1]["levtype"], "pl")
         self.assertEqual(selectors[1]["params"], ["t", "u", "v", "z", "q"])
         self.assertEqual(
-            selectors[1]["levels"], [1000, 925, 850, 700, 500, 300, 250, 200, 50]
+            selectors[1]["levels"],
+            [1000, 925, 850, 700, 600, 500, 400, 300, 250, 200, 150, 100, 50],
         )
+
+    def test_default_ifs_selectors_resolve_against_the_live_index_fixture(self):
+        # Every configured surface param and every (param, level) pair must
+        # name a real message in the captured portal index — otherwise a
+        # variable would silently never be staged (ADR 0001).
+        from georiva_source_ecmwf.source import ECMWFIFSDataSource
+
+        source = ECMWFIFSDataSource({})
+        selectors = source.index_selectors(source.default_variables())
+        entries = fixture_entries()
+
+        for param in selectors[0]["params"]:
+            with self.subTest(param=param):
+                matched = select_byte_ranges(
+                    entries, [{"levtype": "sfc", "params": [param]}]
+                )
+                self.assertEqual(len(matched), 1)
+
+        for param in selectors[1]["params"]:
+            for level in selectors[1]["levels"]:
+                with self.subTest(param=param, level=level):
+                    matched = select_byte_ranges(
+                        entries,
+                        [{"levtype": "pl", "params": [param], "levels": [level]}],
+                    )
+                    self.assertEqual(len(matched), 1)
 
     def test_unknown_requested_variable_is_dropped_with_warning(self):
         from georiva_source_ecmwf.source import ECMWFIFSDataSource

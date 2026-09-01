@@ -26,6 +26,11 @@ SHARED_SURFACE_KEYS = [
     "wind_dir_10m",
 ]
 
+# The variables that make IFS worth having beyond AIFS parity. Convective
+# precipitation (cp) is deliberately absent: the 0.25° oper open-data
+# files do not publish it (verified against live .index files).
+IFS_ONLY_SURFACE_KEYS = ["cape", "ptype", "10fg", "2d", "tcwv", "ssrd"]
+
 
 def _by_key(definitions):
     return {d.key: d for d in definitions}
@@ -43,22 +48,39 @@ class IFSCollectionSpecTest(unittest.TestCase):
         for d in self.defs.values():
             self.assertTrue(d.is_forecast)
 
-    def test_surface_carries_exactly_the_shared_core_variables(self):
+    def test_surface_carries_shared_core_plus_ifs_only_variables(self):
         surface = self.defs["ecmwf-ifs-surface"]
         self.assertEqual(
             [v.key for v in surface.variables],
-            SHARED_SURFACE_KEYS,
+            SHARED_SURFACE_KEYS + IFS_ONLY_SURFACE_KEYS,
         )
 
-    def test_pressure_levels_are_the_aifs_list(self):
-        self.assertEqual(IFS_PRESSURE_LEVELS, AIFS_PRESSURE_LEVELS)
+    def test_pressure_levels_extend_the_aifs_list(self):
+        self.assertEqual(
+            IFS_PRESSURE_LEVELS,
+            [1000, 925, 850, 700, 600, 500, 400, 300, 250, 200, 150, 100, 50],
+        )
+        self.assertEqual(
+            set(IFS_PRESSURE_LEVELS) - set(AIFS_PRESSURE_LEVELS),
+            {600, 400, 150, 100},
+        )
         pl = self.defs["ecmwf-ifs-pressure-levels"]
         expected_keys = [
             f"{base}_{lv}"
             for base in ("t", "u", "v", "z", "q")
-            for lv in AIFS_PRESSURE_LEVELS
+            for lv in IFS_PRESSURE_LEVELS
         ]
         self.assertEqual([v.key for v in pl.variables], expected_keys)
+
+    def test_each_pressure_level_has_a_group(self):
+        pl = self.defs["ecmwf-ifs-pressure-levels"]
+        groups = {g.key: g for g in pl.groups}
+        for lv in IFS_PRESSURE_LEVELS:
+            self.assertIn(f"pl-{lv}", groups)
+            self.assertEqual(
+                list(groups[f"pl-{lv}"].variable_keys),
+                [f"t_{lv}", f"u_{lv}", f"v_{lv}", f"z_{lv}", f"q_{lv}"],
+            )
 
     def test_derived_wind_variables_use_vector_transforms(self):
         surface = self.defs["ecmwf-ifs-surface"]
@@ -87,10 +109,70 @@ class SharedCoreParityTest(unittest.TestCase):
                 aifs_surface.get_variable(key), ifs_surface.get_variable(key), key
             )
 
-    def test_pressure_level_variables_match_aifs_exactly(self):
+    def test_pressure_level_variables_match_aifs_at_shared_levels(self):
         aifs_pl = self.aifs["ecmwf-aifs-pressure-levels"]
         ifs_pl = self.ifs["ecmwf-ifs-pressure-levels"]
-        self.assertEqual(aifs_pl.variables, ifs_pl.variables)
+        for v in aifs_pl.variables:
+            self.assertEqual(v, ifs_pl.get_variable(v.key), v.key)
+
+
+class IFSOnlySurfaceVariablesTest(unittest.TestCase):
+    """The IFS-only surface variables, verified against live IFS GRIB2
+    messages (shortName, units, level) and the portal's `.index` param
+    names — see the fetched-message survey in the implementing PR."""
+
+    def setUp(self):
+        defs = _by_key(parse_collection_defs(IFS_COLLECTIONS))
+        self.surface = defs["ecmwf-ifs-surface"]
+
+    def test_cape_reads_the_published_mucape_message(self):
+        # The portal publishes most-unstable CAPE under index param /
+        # shortName "mucape"; there is no plain "cape" message.
+        cape = self.surface.get_variable("cape")
+        self.assertEqual(cape.source_variable.name, "mucape")
+        self.assertEqual(cape.source_units, "J kg-1")
+        self.assertIsNone(cape.output_units)
+
+    def test_dewpoint_converts_to_celsius_at_2m(self):
+        d2 = self.surface.get_variable("2d")
+        self.assertEqual(d2.source_units, "K")
+        self.assertEqual(d2.output_units, "degC")
+        self.assertEqual(d2.source_variable.name, "2d")
+        self.assertEqual(d2.source_variable.level.dimension, "heightAboveGround")
+        self.assertEqual(d2.source_variable.level.value, 2)
+
+    def test_gust_is_a_10m_height_field_in_metres_per_second(self):
+        gust = self.surface.get_variable("10fg")
+        self.assertEqual(gust.source_units, "m/s")
+        self.assertEqual(gust.source_variable.level.value, 10)
+
+    def test_solar_radiation_exposes_megajoules(self):
+        ssrd = self.surface.get_variable("ssrd")
+        self.assertEqual(ssrd.source_units, "J m-2")
+        self.assertEqual(ssrd.output_units, "MJ m-2")
+
+    def test_precipitation_type_is_a_dimensionless_code(self):
+        ptype = self.surface.get_variable("ptype")
+        self.assertEqual(ptype.source_units, "dimensionless")
+        self.assertIsNone(ptype.output_units)
+        self.assertEqual(ptype.value_range, (0.0, 12.0))
+
+    def test_every_ifs_only_variable_declares_a_value_range(self):
+        for key in IFS_ONLY_SURFACE_KEYS:
+            self.assertIsNotNone(self.surface.get_variable(key).value_range, key)
+
+    def test_ifs_only_variables_are_grouped_by_theme(self):
+        groups = {g.key: g for g in self.surface.groups}
+        self.assertEqual(
+            list(groups["convection"].variable_keys), ["cape", "ptype", "10fg"]
+        )
+        self.assertEqual(
+            list(groups["moisture-radiation"].variable_keys), ["2d", "tcwv", "ssrd"]
+        )
+        # The shared-core groups keep their AIFS shape.
+        self.assertEqual(
+            list(groups["temp-pressure"].variable_keys), ["2t", "msl", "sp", "tp"]
+        )
 
 
 class AIFSSpecUnchangedTest(unittest.TestCase):
