@@ -117,9 +117,9 @@ class SharedCoreParityTest(unittest.TestCase):
 
 
 class IFSOnlySurfaceVariablesTest(unittest.TestCase):
-    """The IFS-only surface variables, verified against live IFS GRIB2
-    messages (shortName, units, level) and the portal's `.index` param
-    names — see the fetched-message survey in the implementing PR."""
+    """The IFS-only surface variables. shortNames, units, levels and
+    value spans were verified against live IFS GRIB2 messages; the
+    `.index` param names against the committed portal index fixture."""
 
     def setUp(self):
         defs = _by_key(parse_collection_defs(IFS_COLLECTIONS))

@@ -7,7 +7,7 @@ request generation).
 """
 
 from .base import ECMWFOpenDataSource
-from .collection_specs import IFS_PRESSURE_LEVELS
+from .collection_specs import IFS_PRESSURE_LEVELS, IFS_SURFACE_INDEX_PARAMS
 from .index_fetch import ECMWFIndexedHTTPFetchStrategy
 from .steps import is_published_ifs_step
 
@@ -86,24 +86,10 @@ class ECMWFIFSDataSource(ECMWFOpenDataSource):
     MAX_FORECAST_HOUR = 360
     FORECAST_STEP = 6
 
-    # The directly-readable surface params, in `.index` naming: the
-    # shared core (derived wind variables are computed downstream, not
-    # fetched) plus the IFS-only variables — note CAPE is published as
-    # "mucape" (most-unstable CAPE).
-    SURFACE_PARAMS = [
-        "2t",
-        "10u",
-        "10v",
-        "msl",
-        "tp",
-        "sp",
-        "mucape",
-        "ptype",
-        "10fg",
-        "2d",
-        "tcwv",
-        "ssrd",
-    ]
+    # The directly-readable surface params in `.index` naming, derived
+    # from the collection spec so a variable added there is fetched
+    # without a second edit here.
+    SURFACE_PARAMS = IFS_SURFACE_INDEX_PARAMS
 
     # The pressure-level shared core, one message per param per level.
     PRESSURE_PARAMS = ["t", "u", "v", "z", "q"]
@@ -144,7 +130,8 @@ class ECMWFIFSDataSource(ECMWFOpenDataSource):
             # ADR 0001: a message never selected is never staged, and
             # re-fetching history cannot recover it — make the drop loud.
             self.logger.warning(
-                f"Requested variables {dropped} are not fetchable surface params; they will not be in the staged subset"
+                f"Requested variables {dropped} are not fetchable surface "
+                f"params; they will not be in the staged subset"
             )
         if surface:
             selectors.append({"levtype": "sfc", "params": surface})

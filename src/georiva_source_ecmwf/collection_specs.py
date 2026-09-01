@@ -206,6 +206,14 @@ def _ifs_only_surface_variables():
     ]
 
 
+def _source_name(variable):
+    """The GRIB shortName a spec variable reads (None for transforms)."""
+    source = variable.get("source_variable")
+    if source is None:
+        return None
+    return source["name"] if isinstance(source, dict) else source
+
+
 def _ifs_surface_groups():
     return [
         *_shared_surface_groups(),
@@ -297,3 +305,14 @@ IFS_COLLECTIONS = {
         "groups": _pressure_level_groups(IFS_PRESSURE_LEVELS),
     },
 }
+
+# The `.index` params the IFS surface collection needs, derived from the
+# spec so a variable added above is fetched without a second edit (the
+# portal's index `param` equals the GRIB shortName for every message we
+# read — e.g. the "cape" variable selects the "mucape" message). Derived
+# transforms carry no source and are computed downstream, not fetched.
+IFS_SURFACE_INDEX_PARAMS = [
+    name
+    for v in [*_shared_surface_variables(), *_ifs_only_surface_variables()]
+    if (name := _source_name(v)) is not None
+]
