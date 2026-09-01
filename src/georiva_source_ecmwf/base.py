@@ -94,6 +94,14 @@ class ECMWFOpenDataSource(BaseDataSource):
         """Whether the portal publishes this step for this model/stream."""
         return step % self.FORECAST_STEP == 0
 
+    def index_selectors(self, variables: list[str]) -> list[dict] | None:
+        """
+        JSON-safe selectors for index-selected fetching (plugin ADR 0001),
+        placed on request params for ECMWFIndexedHTTPFetchStrategy. None
+        (the default) means whole-file fetching.
+        """
+        return None
+
     @property
     def source_type(self) -> DataSourceType:
         return DataSourceType.FORECAST
@@ -194,20 +202,25 @@ class ECMWFOpenDataSource(BaseDataSource):
 
         filename = f"{self.SLUG}_{run_stamp}_{step}h_{self.STREAM}_fc.grib2"
 
+        params = {
+            "url": url,
+            "source": "open_data",
+            "model": self.MODEL_PATH,
+            "grid": GRID,
+            "run_stamp": run_stamp,
+            "step_hours": step,
+            "requested_variables": variables,  # metadata only
+        }
+        selectors = self.index_selectors(variables)
+        if selectors:
+            params["index_selectors"] = selectors
+
         yield FileRequest(
             identifier=f"{self.SLUG}-open-{run_stamp}-{step}h",
             filename=filename,
             valid_time=valid_time,
             reference_time=run_time,
-            params={
-                "url": url,
-                "source": "open_data",
-                "model": self.MODEL_PATH,
-                "grid": GRID,
-                "run_stamp": run_stamp,
-                "step_hours": step,
-                "requested_variables": variables,  # metadata only
-            },
+            params=params,
             expected_format="grib",
             variables=variables,  # metadata only
         )

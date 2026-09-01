@@ -8,6 +8,7 @@ request generation).
 
 from .base import ECMWFOpenDataSource
 from .collection_specs import IFS_PRESSURE_LEVELS
+from .index_fetch import ECMWFIndexedHTTPFetchStrategy
 from .steps import is_published_ifs_step
 
 
@@ -68,7 +69,10 @@ class ECMWFIFSDataSource(ECMWFOpenDataSource):
 
     Only the 00Z and 12Z cycles are served: the portal's 06Z/18Z cycles
     belong to the short-cutoff `scda` stream, which is out of scope.
-    Fetching is whole-file in this slice.
+
+    Fetching is index-selected (plugin ADR 0001): each staged GRIB holds
+    only the messages matching the feed's configured variables/levels,
+    with whole-file fallback when the `.index` is unusable.
     """
 
     type = "ecmwf-ifs"
@@ -82,16 +86,24 @@ class ECMWFIFSDataSource(ECMWFOpenDataSource):
     MAX_FORECAST_HOUR = 360
     FORECAST_STEP = 6
 
+    # The directly-readable surface shared core (derived wind variables
+    # are computed downstream, not fetched).
+    SURFACE_PARAMS = ["2t", "10u", "10v", "msl", "tp", "sp"]
+
+    # The pressure-level shared core, one message per param per level.
+    PRESSURE_PARAMS = ["t", "u", "v", "z", "q"]
+
     PRESSURE_LEVELS = IFS_PRESSURE_LEVELS
+
+    def __init__(self, config: dict, fetch_strategy=ECMWFIndexedHTTPFetchStrategy):
+        super().__init__(config, fetch_strategy)
 
     @property
     def name(self) -> str:
         return "ECMWF IFS"
 
     def default_variables(self) -> list[str]:
-        # The directly-readable surface shared core (derived wind
-        # variables are computed downstream, not fetched).
-        return ["2t", "10u", "10v", "msl", "tp", "sp"]
+        return list(self.SURFACE_PARAMS)
 
     def default_pressure_levels(self) -> list[int]:
         return list(self.PRESSURE_LEVELS)
@@ -102,3 +114,32 @@ class ECMWFIFSDataSource(ECMWFOpenDataSource):
         to 144h; beyond that only 6-hourly steps (to 360h).
         """
         return is_published_ifs_step(step)
+
+    def index_selectors(self, variables: list[str]) -> list[dict] | None:
+        """
+        Selectors for the feed's configured shape: the requested surface
+        params, plus the pressure-level shared core at the configured
+        levels. Unknown/derived variable keys are not fetchable messages
+        and are dropped.
+        """
+        selectors = []
+        surface = [v for v in variables if v in self.SURFACE_PARAMS]
+        dropped = [v for v in variables if v not in self.SURFACE_PARAMS]
+        if dropped:
+            # ADR 0001: a message never selected is never staged, and
+            # re-fetching history cannot recover it — make the drop loud.
+            self.logger.warning(
+                f"Requested variables {dropped} are not fetchable surface "
+                f"params; they will not be in the staged subset"
+            )
+        if surface:
+            selectors.append({"levtype": "sfc", "params": surface})
+        if self.PRESSURE_PARAMS and self.pressure_levels:
+            selectors.append(
+                {
+                    "levtype": "pl",
+                    "params": list(self.PRESSURE_PARAMS),
+                    "levels": list(self.pressure_levels),
+                }
+            )
+        return selectors or None
