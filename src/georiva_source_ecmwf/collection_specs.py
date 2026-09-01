@@ -13,9 +13,8 @@ specs without a configured settings module.
 
 AIFS_PRESSURE_LEVELS = [1000, 925, 850, 700, 500, 300, 250, 200, 50]
 
-# This slice serves the AIFS list; the IFS-only levels (600, 400, 150,
-# 100 hPa) arrive with the IFS-only variables in a later slice.
-IFS_PRESSURE_LEVELS = list(AIFS_PRESSURE_LEVELS)
+# The AIFS list plus the levels only the IFS oper files carry.
+IFS_PRESSURE_LEVELS = [1000, 925, 850, 700, 600, 500, 400, 300, 250, 200, 150, 100, 50]
 
 
 def _height(name, value):
@@ -146,6 +145,91 @@ def _shared_surface_groups():
     ]
 
 
+def _ifs_only_surface_variables():
+    """The surface variables only IFS carries — no AIFS counterpart.
+
+    Names, units, levels and observed value spans were verified against
+    live 0.25° oper GRIB2 messages and their ``.index`` param names.
+    Convective precipitation (cp) is deliberately absent: the open-data
+    oper files do not publish it.
+    """
+    return [
+        {
+            # Published as most-unstable CAPE; there is no plain "cape"
+            # message in the oper files.
+            "key": "cape",
+            "name": "CAPE (Most-Unstable)",
+            "source_units": "J kg-1",
+            "source_variable": "mucape",
+            "value_range": (0.0, 12000.0),
+        },
+        {
+            # GRIB code table 4.201 (0 = none, 1 = rain, ... 12).
+            "key": "ptype",
+            "name": "Precipitation Type",
+            "source_units": "dimensionless",
+            "source_variable": "ptype",
+            "value_range": (0.0, 12.0),
+        },
+        {
+            "key": "10fg",
+            "name": "10m Wind Gust",
+            "source_units": "m/s",
+            "source_variable": _height("10fg", 10),
+            "value_range": (0.0, 100.0),
+        },
+        {
+            "key": "2d",
+            "name": "2m Dewpoint Temperature",
+            "source_units": "K",
+            "output_units": "degC",
+            "source_variable": _height("2d", 2),
+            "value_range": (-70.0, 50.0),
+        },
+        {
+            "key": "tcwv",
+            "name": "Total Column Water Vapour",
+            "source_units": "kg m-2",
+            "source_variable": "tcwv",
+            "value_range": (0.0, 100.0),
+        },
+        {
+            # Accumulated from the start of the forecast, so the span
+            # covers a full 360h run (~30 MJ/day of insolation).
+            "key": "ssrd",
+            "name": "Downward Surface Solar Radiation",
+            "source_units": "J m-2",
+            "output_units": "MJ m-2",
+            "source_variable": "ssrd",
+            "value_range": (0.0, 500.0),
+        },
+    ]
+
+
+def _source_name(variable):
+    """The GRIB shortName a spec variable reads (None for transforms)."""
+    source = variable.get("source_variable")
+    if source is None:
+        return None
+    return source["name"] if isinstance(source, dict) else source
+
+
+def _ifs_surface_groups():
+    return [
+        *_shared_surface_groups(),
+        {
+            "key": "convection",
+            "name": "Convection",
+            "variable_keys": ["cape", "ptype", "10fg"],
+        },
+        {
+            "key": "moisture-radiation",
+            "name": "Moisture & Radiation",
+            "variable_keys": ["2d", "tcwv", "ssrd"],
+        },
+    ]
+
+
 def _shared_pressure_level_variables(levels):
     """The pressure-level shared core: t/u/v/z/q at each level."""
     return [
@@ -210,8 +294,8 @@ IFS_COLLECTIONS = {
         "name": "Surface Variables",
         "time_resolution": "hourly",
         "is_forecast": True,
-        "variables": _shared_surface_variables(),
-        "groups": _shared_surface_groups(),
+        "variables": [*_shared_surface_variables(), *_ifs_only_surface_variables()],
+        "groups": _ifs_surface_groups(),
     },
     "ecmwf-ifs-pressure-levels": {
         "name": "Pressure Level Variables",
@@ -221,3 +305,14 @@ IFS_COLLECTIONS = {
         "groups": _pressure_level_groups(IFS_PRESSURE_LEVELS),
     },
 }
+
+# The `.index` params the IFS surface collection needs, derived from the
+# spec so a variable added above is fetched without a second edit (the
+# portal's index `param` equals the GRIB shortName for every message we
+# read — e.g. the "cape" variable selects the "mucape" message). Derived
+# transforms carry no source and are computed downstream, not fetched.
+IFS_SURFACE_INDEX_PARAMS = [
+    name
+    for v in [*_shared_surface_variables(), *_ifs_only_surface_variables()]
+    if (name := _source_name(v)) is not None
+]

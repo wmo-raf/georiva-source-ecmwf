@@ -7,7 +7,7 @@ request generation).
 """
 
 from .base import ECMWFOpenDataSource
-from .collection_specs import IFS_PRESSURE_LEVELS
+from .collection_specs import IFS_PRESSURE_LEVELS, IFS_SURFACE_INDEX_PARAMS
 from .index_fetch import ECMWFIndexedHTTPFetchStrategy
 from .steps import is_published_ifs_step
 
@@ -86,9 +86,10 @@ class ECMWFIFSDataSource(ECMWFOpenDataSource):
     MAX_FORECAST_HOUR = 360
     FORECAST_STEP = 6
 
-    # The directly-readable surface shared core (derived wind variables
-    # are computed downstream, not fetched).
-    SURFACE_PARAMS = ["2t", "10u", "10v", "msl", "tp", "sp"]
+    # The directly-readable surface params in `.index` naming, derived
+    # from the collection spec so a variable added there is fetched
+    # without a second edit here.
+    SURFACE_PARAMS = IFS_SURFACE_INDEX_PARAMS
 
     # The pressure-level shared core, one message per param per level.
     PRESSURE_PARAMS = ["t", "u", "v", "z", "q"]

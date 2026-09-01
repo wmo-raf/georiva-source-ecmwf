@@ -29,6 +29,14 @@ The two models share a variable core — identical keys and output units for
 pressure, total precipitation, and t/u/v/z/q on the pressure levels — so
 AIFS and IFS layers render comparably side by side.
 
+Beyond that core, the IFS surface collection carries the IFS-only variables
+the physics model supports: CAPE (published as most-unstable CAPE,
+`mucape`), precipitation type, 10m wind gusts, 2m dewpoint, total column
+water vapour, and downward surface solar radiation. Convective
+precipitation is not published in the 0.25° oper open-data files, so it is
+deliberately absent. The IFS pressure-level collection extends the AIFS
+level list with 600, 400, 150, and 100 hPa.
+
 ## Data model
 
 | Concept | Maps to |
