@@ -1,6 +1,6 @@
 # Staged ECMWF GRIBs are index-selected subsets, not the published files
 
-Status: accepted — implementation pending (issue #7); until it lands, all feeds fetch whole files.
+Status: accepted — implemented (issue #7): IFS feeds fetch index-selected subsets; AIFS still whole-file.
 
 ECMWF open-data per-step GRIB2 files carry far more parameters/levels than a feed is configured for
 (IFS files run to hundreds of MB). We fetch via the companion `.index` file: parse its JSON-lines
