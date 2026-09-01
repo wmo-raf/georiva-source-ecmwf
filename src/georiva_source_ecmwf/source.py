@@ -124,6 +124,14 @@ class ECMWFIFSDataSource(ECMWFOpenDataSource):
         """
         selectors = []
         surface = [v for v in variables if v in self.SURFACE_PARAMS]
+        dropped = [v for v in variables if v not in self.SURFACE_PARAMS]
+        if dropped:
+            # ADR 0001: a message never selected is never staged, and
+            # re-fetching history cannot recover it — make the drop loud.
+            self.logger.warning(
+                f"Requested variables {dropped} are not fetchable surface "
+                f"params; they will not be in the staged subset"
+            )
         if surface:
             selectors.append({"levtype": "sfc", "params": surface})
         if self.PRESSURE_PARAMS and self.pressure_levels:

@@ -10,9 +10,14 @@ It ships:
 - **`ECMWFAIFSDataSource`** / **`ECMWFIFSDataSource`** — thin subclasses of a
   shared `ECMWFOpenDataSource` base that generates download requests for the
   latest published run (today, falling back to yesterday) from
-  `https://data.ecmwf.int/forecasts`, over plain HTTPS (`HTTPFetchStrategy`).
-  One GRIB2 file is fetched per forecast step; the file holds many variables,
-  which are carried as metadata for downstream extraction.
+  `https://data.ecmwf.int/forecasts`. One GRIB2 file is staged per forecast
+  step. AIFS fetches the whole published file over plain HTTPS
+  (`HTTPFetchStrategy`); IFS fetches an **index-selected subset**
+  (`ECMWFIndexedHTTPFetchStrategy`): the companion `.index` is parsed, only
+  the messages matching the feed's configured variables/levels are downloaded
+  with HTTP Range requests, and they are concatenated into a valid — but
+  smaller — GRIB2 (see `docs/adr/0001`). When the index is unusable the fetch
+  falls back to the whole published file with a logged warning.
 - **`ECMWFAIFSDataFeed`** / **`ECMWFIFSDataFeed`** — DataFeeds with two
   collections each (surface variables and pressure-level variables) at 0.25°
   resolution. The operator chooses which model runs to fetch — 00/06/12/18Z

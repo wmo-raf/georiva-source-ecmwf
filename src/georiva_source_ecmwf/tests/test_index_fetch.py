@@ -314,6 +314,19 @@ class SourceWiringTest(unittest.TestCase):
             selectors[1]["levels"], [1000, 925, 850, 700, 500, 300, 250, 200, 50]
         )
 
+    def test_unknown_requested_variable_is_dropped_with_warning(self):
+        from georiva_source_ecmwf.source import ECMWFIFSDataSource
+
+        source = ECMWFIFSDataSource(
+            {"forecast_hours": [0], "run_hours": [0], "variables": ["2t", "bogus"]}
+        )
+
+        with self.assertLogs("georiva.datasource.ecmwf-ifs", level="WARNING") as logs:
+            selectors = source.index_selectors(source.requested_variables)
+
+        self.assertEqual(selectors[0], {"levtype": "sfc", "params": ["2t"]})
+        self.assertTrue(any("bogus" in m for m in logs.output))
+
     def test_ifs_uses_the_indexed_strategy(self):
         from georiva_source_ecmwf.source import ECMWFIFSDataSource
 
