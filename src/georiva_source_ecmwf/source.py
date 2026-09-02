@@ -37,7 +37,13 @@ class ECMWFAIFSDataSource(ECMWFOpenDataSource):
             "source_units": "Pa",
             "grib_param": 151,
         },
-        "tp": {"name": "Total Precipitation", "source_units": "m", "grib_param": 228},
+        # AIFS stamps tp as kg m-2 (numerically mm), paramId 228228 — unlike
+        # IFS, whose tp is metres under paramId 228 (issue #15).
+        "tp": {
+            "name": "Total Precipitation",
+            "source_units": "kg m-2",
+            "grib_param": 228228,
+        },
         "sp": {"name": "Surface Pressure", "source_units": "Pa", "grib_param": 134},
     }
 

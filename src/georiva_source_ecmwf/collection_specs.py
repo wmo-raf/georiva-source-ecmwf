@@ -61,9 +61,15 @@ def _pl_vars(
     return v
 
 
-def _shared_surface_variables():
-    """The surface shared core: identical keys and output units in AIFS
-    and IFS, so the two models render comparably side by side."""
+def _shared_surface_variables(tp_source_units="m", tp_output_units="mm"):
+    """The surface shared core: identical keys and exposed units in AIFS
+    and IFS, so the two models render comparably side by side.
+
+    Source units may differ per model where the portals stamp the same
+    field differently: IFS tp is metres (paramId 228) while AIFS tp is
+    kg m-2 — numerically millimetres — (paramId 228228), so AIFS passes
+    tp_source_units="mm" with no conversion (issue #15). Both expose mm.
+    """
     return [
         {
             "key": "2t",
@@ -98,8 +104,12 @@ def _shared_surface_variables():
         {
             "key": "tp",
             "name": "Total Precipitation",
-            "source_units": "m",
-            "output_units": "mm",
+            "source_units": tp_source_units,
+            **(
+                {"output_units": tp_output_units}
+                if tp_output_units != tp_source_units
+                else {}
+            ),
             "source_variable": "tp",
             "value_range": (0.0, 500.0),
         },
@@ -277,7 +287,10 @@ AIFS_COLLECTIONS = {
         "name": "Surface Variables",
         "time_resolution": "hourly",
         "is_forecast": True,
-        "variables": _shared_surface_variables(),
+        # AIFS tp arrives as kg m-2 (numerically mm) — no m->mm conversion.
+        "variables": _shared_surface_variables(
+            tp_source_units="mm", tp_output_units="mm"
+        ),
         "groups": _shared_surface_groups(),
     },
     "ecmwf-aifs-pressure-levels": {
