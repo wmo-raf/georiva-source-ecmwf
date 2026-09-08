@@ -321,6 +321,7 @@ class SourceWiringTest(unittest.TestCase):
                     "2d",
                     "tcwv",
                     "ssrd",
+                    "tcc",
                 ],
             },
         )

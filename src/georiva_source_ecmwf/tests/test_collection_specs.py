@@ -30,7 +30,7 @@ SHARED_SURFACE_KEYS = [
 # The variables that make IFS worth having beyond AIFS parity. Convective
 # precipitation (cp) is deliberately absent: the 0.25° oper open-data
 # files do not publish it (verified against live .index files).
-IFS_ONLY_SURFACE_KEYS = ["cape", "ptype", "10fg", "2d", "tcwv", "ssrd"]
+IFS_ONLY_SURFACE_KEYS = ["cape", "ptype", "10fg", "2d", "tcwv", "ssrd", "tcc"]
 
 
 def _by_key(definitions):
@@ -181,6 +181,15 @@ class IFSOnlySurfaceVariablesTest(unittest.TestCase):
         self.assertEqual(ssrd.source_units, "J m-2")
         self.assertEqual(ssrd.output_units, "MJ m-2")
 
+    def test_cloud_cover_converts_the_grib_fraction_to_percent(self):
+        # The oper GRIB carries tcc as a 0-1 fraction (units "(0 - 1)");
+        # locationforecast and every chart want percent.
+        tcc = self.surface.get_variable("tcc")
+        self.assertEqual(tcc.source_units, "dimensionless")
+        self.assertEqual(tcc.output_units, "%")
+        self.assertEqual(tcc.source_variable.name, "tcc")
+        self.assertEqual(tcc.value_range, (0.0, 100.0))
+
     def test_precipitation_type_is_a_dimensionless_code(self):
         ptype = self.surface.get_variable("ptype")
         self.assertEqual(ptype.source_units, "dimensionless")
@@ -197,7 +206,8 @@ class IFSOnlySurfaceVariablesTest(unittest.TestCase):
             list(groups["convection"].variable_keys), ["cape", "ptype", "10fg"]
         )
         self.assertEqual(
-            list(groups["moisture-radiation"].variable_keys), ["2d", "tcwv", "ssrd"]
+            list(groups["moisture-radiation"].variable_keys),
+            ["2d", "tcwv", "ssrd", "tcc"],
         )
         # The shared-core groups keep their AIFS shape.
         self.assertEqual(
