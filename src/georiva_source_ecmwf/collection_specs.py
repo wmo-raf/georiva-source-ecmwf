@@ -211,6 +211,19 @@ def _ifs_only_surface_variables():
             "source_variable": "ssrd",
             "value_range": (0.0, 500.0),
         },
+        {
+            # ECMWF publishes tcc (paramId 164) as a fraction: the GRIB
+            # stamps units "(0 - 1)" and a live 0.25deg oper message spans
+            # exactly 0..1 (verified 20260908 00z step 6). Exposed as
+            # percent -- the conventional unit for cloud cover, and what
+            # locationforecast's cloud_area_fraction reports.
+            "key": "tcc",
+            "name": "Total Cloud Cover",
+            "source_units": "dimensionless",
+            "output_units": "%",
+            "source_variable": "tcc",
+            "value_range": (0.0, 100.0),
+        },
     ]
 
 
@@ -233,7 +246,7 @@ def _ifs_surface_groups():
         {
             "key": "moisture-radiation",
             "name": "Moisture & Radiation",
-            "variable_keys": ["2d", "tcwv", "ssrd"],
+            "variable_keys": ["2d", "tcwv", "ssrd", "tcc"],
         },
     ]
 
