@@ -56,6 +56,25 @@ class IFSCollectionSpecTest(unittest.TestCase):
             SHARED_SURFACE_KEYS + IFS_ONLY_SURFACE_KEYS,
         )
 
+    def test_each_variable_declares_its_time_statistic(self):
+        """tp and ssrd are running totals since the run started, so they have
+        no lead-0 step; 10fg is a maximum over the hours before its step
+        (GeoRiva ADR 0051). Everything else is instantaneous."""
+        declared = {
+            v.key: (v.time_statistic or "instant", v.statistic_window)
+            for d in self.defs.values()
+            for v in d.variables
+            if v.time_statistic not in (None, "instant")
+        }
+        self.assertEqual(
+            declared,
+            {
+                "tp": ("sum", "run_start"),
+                "ssrd": ("sum", "run_start"),
+                "10fg": ("max", "preceding_interval"),
+            },
+        )
+
     def test_pressure_levels_extend_the_aifs_list(self):
         self.assertEqual(
             IFS_PRESSURE_LEVELS,
