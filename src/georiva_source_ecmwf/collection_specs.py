@@ -110,6 +110,10 @@ def _shared_surface_variables(tp_source_units="m"):
             "output_units": "mm",
             "source_variable": "tp",
             "value_range": (0.0, 500.0),
+            # Accumulated from the start of the run: zero at its first step,
+            # which so does not exist (GeoRiva ADR 0051).
+            "time_statistic": "sum",
+            "statistic_window": "run_start",
         },
         {
             "key": "sp",
@@ -185,6 +189,9 @@ def _ifs_only_surface_variables():
             "source_units": "m/s",
             "source_variable": _height("10fg", 10),
             "value_range": (0.0, 100.0),
+            # The maximum gust over the hours before each step.
+            "time_statistic": "max",
+            "statistic_window": "preceding_interval",
         },
         {
             "key": "2d",
@@ -210,6 +217,8 @@ def _ifs_only_surface_variables():
             "output_units": "MJ m-2",
             "source_variable": "ssrd",
             "value_range": (0.0, 500.0),
+            "time_statistic": "sum",
+            "statistic_window": "run_start",
         },
         {
             # ECMWF publishes tcc (paramId 164) as a fraction: the GRIB
